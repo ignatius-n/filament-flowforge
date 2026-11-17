@@ -1,6 +1,17 @@
+---
+title: "Customization"
+description: "Customize your Kanban boards with rich content, actions, and filtering."
+canonical_url: "https://relaticle.github.io/essentials/customization"
+---
 # Customization
 
 > Customize your Kanban boards with rich content, actions, and filtering.
+
+<callout type="info">
+
+Sections marked "Modern boards only" work on pages that extend a `Modern` board class. A classic board ignores them. See [Modern board](https://relaticle.github.io/essentials/integration-patterns#modern-board).
+
+</callout>
 
 ## Rich Card Content
 
@@ -151,7 +162,7 @@ use Relaticle\Flowforge\Components\CardFlex;
 
 ## Column Actions
 
-Add actions to column headers for creating new cards or bulk operations:
+Add actions to column headers for creating new cards or bulk operations. On a Modern board, use `createCardAction()` (see Add Card Action below) to create cards. Use `columnActions()` for the rest.
 
 ```php
 use Filament\Actions\CreateAction;
@@ -171,7 +182,7 @@ public function board(Board $board): Board
                         ->options(['low' => 'Low', 'medium' => 'Medium', 'high' => 'High'])
                         ->default('medium'),
                 ])
-                ->mutateFormDataUsing(function (array $data, array $arguments): array {
+                ->mutateDataUsing(function (array $data, array $arguments): array {
                     if (isset($arguments['column'])) {
                         $data['status'] = $arguments['column'];
                         $data['position'] = $this->getBoardPositionInColumn($arguments['column']);
@@ -181,6 +192,106 @@ public function board(Board $board): Board
         ]);
 }
 ```
+
+## Add Card Action
+
+Modern boards only.
+
+```php
+use Filament\Actions\CreateAction;
+use Filament\Forms\Components\TextInput;
+
+->createCardAction(
+    CreateAction::make('createTask')
+        ->model(Task::class)
+        ->schema([TextInput::make('title')->required()])
+        ->mutateDataUsing(fn (array $data, array $arguments): array => [
+            ...$data,
+            'status' => $arguments['column'],
+            'position' => $this->getBoardPositionInColumn($arguments['column'], 'bottom'),
+        ]),
+)
+```
+
+The action appears as a `+` in each column header and as an add row under the cards, labelled with the card label (`Add Task`). Flowforge passes the column identifier as `$arguments['column']`.
+
+Flowforge owns the action's `disabled()` state. It disables the header button and the add row for a full column, and refuses the action for a column the board does not show. It also keeps the add row disabled when the action's authorization fails and you call `authorizationTooltip()`. Hide the action with `visible()` or block it with `authorize()`. Flowforge renders nothing for an action that is not visible.
+
+## Card Components
+
+These components are designed for Modern boards. On a classic board their look is not guaranteed.
+
+```php
+use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Schema;
+use Relaticle\Flowforge\Components\{CardAvatar, CardFlex, CardMeta, CardTag, CardTitle};
+
+->cardSchema(fn (Schema $schema): Schema => $schema->components([
+    CardFlex::make([
+        TextEntry::make('reference')->hiddenLabel()->color('gray'),
+        CardTag::make('category')->color(fn (string $state): string => $state === 'billing' ? 'warning' : 'info'),
+    ])->justify('between'),
+    CardTitle::make(),
+    CardFlex::make([
+        CardMeta::make([
+            TextEntry::make('due_date')->date('M j')->icon('heroicon-o-calendar'),
+            TextEntry::make('points')->suffix(' pt'),
+        ]),
+        CardAvatar::make('assignees')->limit(3),
+    ])->justify('between'),
+]))
+```
+
+- `CardTitle` places the title. Without it the title renders first.
+- `CardTag` is a dot and a label. It renders one dot and label per item when the state is an array or a collection.
+- `CardMeta` is a muted row of entries. Labels are hidden, and badges inside it render as plain text.
+- `CardAvatar` shows one avatar, or a stack with `+N` after `limit()` people (default 3).
+
+The components honor a small part of the entry API:
+
+- `CardTag` honors `formatStateUsing()` and `color()`. A `color()` closure runs once per item and receives that item as `$state`.
+- `CardAvatar` honors `limit()`, `nameUsing()` and `avatarUrlUsing()`. Both closures receive the model as `$person`, or typed by its class. Its state must be a model or a collection of models, such as a relationship.
+- Without `avatarUrlUsing()`, `CardAvatar` uses `getFilamentAvatarUrl()` when the model implements `HasAvatar`. Without a url it shows initials and never calls an external service.
+- `url()`, `action()`, `tooltip()` and `icon()` are not applied by `CardTag` or `CardAvatar`.
+
+## Column Summaries
+
+Modern boards only.
+
+```php
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Number;
+
+->columnSummary(fn (Builder $columnQuery): ?string => Number::currency($columnQuery->sum('amount')))
+```
+
+The closure runs once per column. The query carries the active filters and search, so the summary matches the cards on screen. Name the parameter `$query` or `$columnQuery`, or type it as the Eloquent builder. Add a `Column $column` parameter to read the column. Return `null` or an empty string to hide the summary. A collapsed rail shows no summary.
+
+## Column Limits
+
+Modern boards only.
+
+```php
+Column::make('in_progress')->limit(3)
+```
+
+The header reads `3/3` and takes the warning color at the limit. A full column refuses drops while the card still hovers over it, and the add row and header `+` disable. The server checks again under a cache lock and refuses with a message if the column filled in the meantime.
+
+- The limit counts every card in the column, including cards a filter or search hides.
+- Reordering inside a full column is always allowed.
+- The lock needs a cache store that every server shares: redis, memcached, database or dynamodb. The `array` store locks per process and the `null` store never blocks, so the guard does nothing under either.
+- A move holds the lock for at most `getColumnLockSeconds()` (10) and waits `getColumnLockWaitSeconds()` (5) for it. Then it refuses with "Another card is moving into <column>
+
+
+
+</column>
+
+. Try again.", where `:column` is the column label. Override these protected methods on your page to change the values.
+- The add row checks the limit without the lock. A create and a drop at the same instant can leave the column one card over its limit.
+
+## Styling a Modern Board
+
+Modern boards style through CSS variables, class hooks and data attributes. The [Design System](https://relaticle.github.io/essentials/design-system) page lists every one and the rules for overriding them.
 
 ## Card Actions
 
@@ -200,6 +311,181 @@ public function board(Board $board): Board
         ->cardAction('edit'); // Makes cards clickable
 }
 ```
+
+## Header Toolbar
+
+By default, filters and search render in a separate toolbar above the board. Enable `headerToolbar()` to move them inline with the page title for a more compact layout:
+
+```php
+public function board(Board $board): Board
+{
+    return $board
+        ->searchable(['title', 'description'])
+        ->filters([
+            SelectFilter::make('priority')->options([...]),
+        ])
+        ->headerToolbar();
+}
+```
+
+The header toolbar supports `Dropdown` and `Modal` filter layouts. For other layouts (AboveContent, BeforeContent, etc.), leave `headerToolbar` disabled (the default) and the full filter view will be used instead.
+
+Actions from your page's `getHeaderActions()` render after the search field, and Filament's `PAGE_HEADER_*` render hooks still apply.
+
+## Collapse Empty Columns
+
+Every column is 300px wide, so a long pipeline spends most of the screen on stages
+holding no work. Enable `collapseEmptyColumns()` and a column with no cards renders as a
+48px rail carrying its count and its name, the same convention Trello, GitLab and
+ClickUp use for a collapsed list:
+
+```php
+public function board(Board $board): Board
+{
+    return $board
+        ->collapseEmptyColumns();
+}
+```
+
+Three things the rail keeps, and they are the point of collapsing rather than hiding:
+
+- It is a full drop target. Drag a card over a rail and that rail alone widens to a full
+column with its drop zone, so you aim at a slim target and drop into a wide one. Every
+other rail keeps its width and its name, so the board does not reflow under the pointer
+mid-drag. A card dropped on a rail leaves it expanded, and a column losing its last card
+collapses. Neither needs a reload.
+- It keeps its column actions, so you can still create a card in a stage holding none.
+- It keeps its name and count, so the pipeline still reads end to end.
+
+The board never collapses every column at once. When nothing on the board has a card,
+whether the board is new or a search matched nothing, all columns render at full width so
+the empty state stays readable.
+
+Style the rail with the `.flowforge-column-collapsed` class.
+
+On a Modern board the rail also keeps the header `+` from `createCardAction()`, shows no column summary and no add row, and carries `data-collapsed` on `.ff-column`. With a grouping active, every column keeps its width so every lane cell stays a drop target.
+
+## Collapse Chosen Columns
+
+Collapse columns by id, or all of them, when your app owns the state. Both options take a
+value or a closure, so a host can read them from a user preference:
+
+```php
+public function board(Board $board): Board
+{
+    return $board
+        ->collapsedColumns(fn (): array => $this->collapsedStages)
+        ->collapseAllColumns(fn (): bool => $this->collapseEverything);
+}
+```
+
+Ids that match no column, or a hidden column, are ignored. A collapsed column renders the
+same rail as an empty one and stays a full drop target. The empty-column rule from
+`collapseEmptyColumns()` keeps working beside these options.
+
+### Let users toggle columns
+
+`collapsibleColumns()` turns on double-click in a column's empty space, flat or in a lane cell, and
+a click on a collapsed rail. A double-click on a card, the add card row or a button does nothing. A
+header without a `columnHeaderMenu()` collapses on double-click too. A header with one leaves its
+clicks to the menu.
+Flowforge keeps no state. It calls your closure with the column id and the new state, and you
+store it where `collapsedColumns()` reads it:
+
+```php
+->collapsedColumns(fn (): array => $this->collapsedStages)
+->collapsibleColumns(function (string $columnId, bool $collapsed): void {
+    $this->collapsedStages = $collapsed
+        ? [...$this->collapsedStages, $columnId]
+        : array_values(array_diff($this->collapsedStages, [$columnId]));
+})
+```
+
+The closure never runs for an unknown or hidden column id. A double-click on the header's action
+buttons does not toggle the column.
+
+A rail collapsed by `collapsedColumns()` or `collapseAllColumns()` expands on a click. Under
+`collapseAllColumns()` a click waits 300ms for a second one. A single click calls your closure with
+`$alone` false, so turn collapse all off. A double-click passes `$alone` true, so open that column
+alone and list the others as collapsed. The closure may leave `$alone` out of its parameters. A column that `collapseEmptyColumns()` collapses has no click
+binding, and a toggle for it never reaches your closure. Flowforge rebuilds the board after your closure runs. Still, pass
+a value your page changes during a request as a closure, as above, so every read sees the new state.
+
+### Open a menu from the column header
+
+`columnHeaderMenu()` turns the column heading into a menu trigger. Your closure receives the column
+as an array and returns the block the panel shows first. The panel then lists the column's visible
+actions from `columnActions()`, so the separate actions button goes away. The add card button stays
+in the header.
+
+```php
+use Illuminate\Support\HtmlString;
+
+->columnHeaderMenu(fn (array $column): ?HtmlString => new HtmlString(
+    view('boards.stage-settings', ['stage' => $column['id']])->render(),
+))
+```
+
+A click opens the menu at once, over the column at the column's width, so it covers the header it
+came from. The second click of a double-click lands in the menu and leaves it open. A
+press that moves more than 4px before release is a header drag, so it does not open the menu. Mark
+a field in your block with `data-autofocus` and a mouse or trackpad click focuses it with the caret
+at the end. A touch tap does not, so a phone keeps its keyboard down. Return `null` for no
+block. A column with no block and no visible actions renders a plain header, and a collapsed
+column has no menu.
+
+The trigger is a `div` with `role="button"`, not a `button`, so a drag handle that filters out
+buttons still grabs the header.
+
+### Add a column from the board
+
+`addColumnUsing()` adds a tile after the last column. A click on it opens a column-width ghost
+column with a name form at its top, focused. Enter submits. Escape or a click outside the form
+cancels. Flowforge keeps no columns. It passes the trimmed name to
+your closure and rebuilds the board once the closure returns, so a `columns()` list that reads
+your state shows the new column in the same response:
+
+```php
+use Illuminate\Validation\ValidationException;
+
+->addColumnUsing(function (string $name): void {
+    throw_if(
+        $this->stages->contains($name),
+        ValidationException::withMessages(['name' => 'That stage already exists.']),
+    );
+
+    $this->stages->push($name);
+})
+->addColumnLabel('Add stage')
+->addColumnPlaceholder('Stage name')
+```
+
+A blank name never reaches your closure. A `ValidationException` from the closure shows its first
+message under the input. `addColumnLabel()` sets the tooltip and the input label, and defaults to
+"Add column". `addColumnPlaceholder()` sets the input placeholder, and defaults to "Column name". The tile renders only while `addColumnUsing()` is set, so hide it for a user by not
+setting it. With a grouping active, the tile is an extra track in the header row only, and every lane
+cell keeps its column.
+
+`addColumnColors()` turns the form's dot into a color picker. Pass the palette as color values
+keyed to their labels. The picked color reaches your closure as `$color`, and a value outside the
+palette or no pick arrives as `null`. `addColumnDefaultColor()` names the palette color the form
+opens on, so the dot and the grid show it selected. Leaving it unpicked still sends `null`:
+
+```php
+->addColumnUsing(fn (string $name, ?string $color) => $this->addStage($name, $color ?? 'gray'))
+->addColumnColors(['#ff5454' => 'Red', '#266df0' => 'Blue', '#a2a4a7' => 'Gray'])
+->addColumnDefaultColor('#a2a4a7')
+```
+
+The picker is a radio group. Arrow keys move between swatches, Enter or Space picks one, and Escape closes the grid and returns focus to the dot. `addColumnColorLabel()` sets each swatch's accessible name, with `:color` standing for the palette label, and defaults to "Set color to <color>
+
+
+
+</color>
+
+".
+
+Opening the form scrolls the board to its end, so the new column and the tile both show.
 
 ## Search and Filtering
 
@@ -308,3 +594,95 @@ use Filament\Support\Colors\Color;
         ->color('#22c55e'),                  // Custom hex
 ])
 ```
+
+### Building Columns From Enums
+
+If your model already uses a backed enum for its status attribute, pass the enum
+cases directly to `Column::enum()`. The column identifier is taken from
+`$enum->value`, and Filament's `HasLabel` / `HasColor` / `HasIcon` contracts are
+applied automatically when the enum implements them.
+
+```php
+use Filament\Support\Contracts\HasColor;
+use Filament\Support\Contracts\HasIcon;
+use Filament\Support\Contracts\HasLabel;
+
+enum TaskStatus: string implements HasColor, HasIcon, HasLabel
+{
+    case Todo = 'todo';
+    case InProgress = 'in_progress';
+    case Done = 'done';
+
+    public function getLabel(): string
+    {
+        return match ($this) {
+            self::Todo => 'To Do',
+            self::InProgress => 'In Progress',
+            self::Done => 'Done',
+        };
+    }
+
+    public function getColor(): string
+    {
+        return match ($this) {
+            self::Todo => 'gray',
+            self::InProgress => 'blue',
+            self::Done => 'green',
+        };
+    }
+
+    public function getIcon(): string
+    {
+        return match ($this) {
+            self::Todo => 'heroicon-o-queue-list',
+            self::InProgress => 'heroicon-o-arrow-path',
+            self::Done => 'heroicon-o-check',
+        };
+    }
+}
+
+->columns(
+    array_map(fn (TaskStatus $status) => Column::enum($status), TaskStatus::cases()),
+)
+```
+
+Any contract your enum does not implement is simply skipped. You can start
+with `HasLabel` only and add color/icon later without changing the call site.
+Int-backed enums are supported too; the value is coerced to a string column
+identifier.
+
+### Conditional Visibility
+
+Hide or show columns based on runtime state (current user, feature flags,
+permissions, toggles on the page). Use `->hidden()` to hide a column or
+`->visible()` to show one. Both accept a boolean literal or a closure. A
+hidden column is excluded from rendering and from every column getter
+(`getColumns()`, `getColumnIdentifiers()`, `getColumnLabels()`,
+`getColumnColors()`), so counts and other column-derived data stay in sync.
+
+```php
+use Relaticle\Flowforge\Column;
+
+->columns([
+    Column::make('todo')->label('To Do')->color('gray'),
+    Column::make('in_progress')->label('In Progress')->color('blue'),
+    Column::make('completed')->label('Completed')->color('green'),
+
+    // Permanently hidden, useful for columns you plan to enable later.
+    Column::make('archived')->label('Archived')->hidden(),
+
+    // Conditionally visible based on a Livewire property / user state.
+    Column::make('internal_review')
+        ->label('Internal Review')
+        ->visible(fn () => auth()->user()?->isStaff()),
+])
+```
+
+Both methods are re-evaluated on every render, so toggling a Livewire
+property that the closure reads will show or hide the column immediately.
+When both are set, `hidden(true)` wins over `visible(true)`.
+
+
+## Sitemap
+
+See the full [sitemap](https://relaticle.github.io/sitemap.md) for all pages.

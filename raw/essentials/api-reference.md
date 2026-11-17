@@ -1,3 +1,8 @@
+---
+title: "API Reference"
+description: "Complete reference for Flowforge configuration methods."
+canonical_url: "https://relaticle.github.io/essentials/api-reference"
+---
 # API Reference
 
 > Complete reference for Flowforge configuration methods.
@@ -95,6 +100,38 @@
     
     <td>
       Field name for card titles
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        cardLabel(string|Closure|null)
+      </code>
+    </td>
+    
+    <td>
+      Name of a single card, e.g. "Task"
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        pluralCardLabel(string|Closure|null)
+      </code>
+    </td>
+    
+    <td>
+      Name of a set of cards, e.g. "Tasks"
     </td>
     
     <td>
@@ -261,6 +298,214 @@
       
     </td>
   </tr>
+  
+  <tr>
+    <td>
+      <code>
+        headerToolbar(bool)
+      </code>
+    </td>
+    
+    <td>
+      Render filters/search inline with page title
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        collapseEmptyColumns(bool)
+      </code>
+    </td>
+    
+    <td>
+      Collapse columns holding no cards into a rail
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        collapsedColumns(array|Closure)
+      </code>
+    </td>
+    
+    <td>
+      Collapse the listed column ids into a rail. Unknown and hidden ids are ignored
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        collapseAllColumns(bool|Closure)
+      </code>
+    </td>
+    
+    <td>
+      Collapse every visible column into a rail
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        collapsibleColumns(?Closure)
+      </code>
+    </td>
+    
+    <td>
+      Let users toggle a column by double-clicking its empty space or its header (one without a <code>
+        columnHeaderMenu()
+      </code>
+      
+      ), or clicking its rail. Columns from <code>
+        collapsedColumns()
+      </code>
+      
+       or <code>
+        collapseAllColumns()
+      </code>
+      
+       expand from the rail. The closure receives <code>
+        string $columnId
+      </code>
+      
+       and <code>
+        bool $collapsed
+      </code>
+      
+       (the new state)
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        columnHeaderMenu(?Closure)
+      </code>
+    </td>
+    
+    <td>
+      Turn the column heading into a menu trigger. The closure receives <code>
+        array $column
+      </code>
+      
+       and returns an <code>
+        Htmlable
+      </code>
+      
+       block, or <code>
+        null
+      </code>
+      
+       for none. The panel holds the block, then the column actions as list items
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        addColumnUsing(?Closure)
+      </code>
+    </td>
+    
+    <td>
+      Show an add column tile after the last column. The closure receives <code>
+        string $name
+      </code>
+      
+      , the trimmed name the user typed. Throw a <code>
+        ValidationException
+      </code>
+      
+       to show its first message under the input. Leave it unset to hide the tile
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        addColumnLabel(string|Closure|null)
+      </code>
+    </td>
+    
+    <td>
+      The tile's tooltip and input label. Defaults to "Add column"
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        addColumnPlaceholder(string|Closure|null)
+      </code>
+    </td>
+    
+    <td>
+      The input's placeholder. Defaults to "Column name"
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        addColumnColorLabel(string|Closure|null)
+      </code>
+    </td>
+    
+    <td>
+      The accessible name of each swatch in the color picker. <code>
+        :color
+      </code>
+      
+       stands for the palette label. Defaults to "Set color to <color>
+        
+      </color>
+      
+      "
+    </td>
+    
+    <td>
+      
+    </td>
+  </tr>
 </tbody>
 </table>
 
@@ -286,6 +531,8 @@ public function board(Board $board): Board
 
 ```php
 ->recordTitleAttribute('title')                   // Card title field
+->cardLabel('Task')                               // Defaults to the model label
+->pluralCardLabel('Tasks')                        // Defaults to the plural model label
 ->cardSchema(fn(Schema $schema) => $schema        // Rich card content
     ->components([
         TextEntry::make('description'),
@@ -293,6 +540,25 @@ public function board(Board $board): Board
     ])
 )
 ```
+
+### Card Labels
+
+Explicit labels take precedence over resource and model labels.
+Otherwise, Flowforge uses the board page's resource, then the model's resource in the current panel, then the model name.
+Without a resource or model, it uses the package translations.
+
+Model names are not translated automatically.
+Existing boards, including standalone boards, can therefore display different labels after upgrading.
+Set translated labels explicitly to preserve the previous wording:
+
+```php
+->cardLabel(fn (): string => __('flowforge::flowforge.card_label'))
+->pluralCardLabel(fn (): string => __('flowforge::flowforge.plural_card_label'))
+```
+
+Use your application's translation keys for custom names.
+Set both labels for languages whose plural forms cannot be derived from the singular label.
+Closures resolve in the current locale when the board renders.
 
 ### Actions Configuration
 
@@ -306,6 +572,33 @@ public function board(Board $board): Board
 ])
 ->cardAction('edit')                              // Make cards clickable
 ```
+
+`cardAction()` takes the name of an action registered in `cardActions()`. When that
+action is configured with `->url()`, the card renders as a native link (respecting
+`->openUrlInNewTab()`) instead of opening a modal, so middle-click and "copy link
+address" work as expected:
+
+```php
+->cardActions([
+    Action::make('view')
+        ->url(fn (Task $record): string => TaskResource::getUrl('view', ['record' => $record])),
+])
+->cardAction('view')
+```
+
+A url decides, exactly as it does for a table row. Filament's `ListRecords` builds
+`recordUrl()` from the first `view`/`edit` action whose `getUrl()` is filled and has
+`recordAction()` skip those same actions, without consulting their modal state. A card
+follows that rule, so the same action behaves the same way in a board and in a table.
+
+Two consequences worth knowing:
+
+- An action declaring both a url and a modal (`->requiresConfirmation()`, a custom modal
+heading, a schema) renders as a link and never opens that modal. Filament's own table
+row and actions dropdown do the same. Pick one or the other.
+- A url inherited from the page's `getDefaultActionUrl()` counts, since `getUrl()`
+consults it. Only `->postToUrl()` actions stay on the click handler, because a POST
+needs a form rather than an anchor.
 
 ### Search & Filtering
 
@@ -323,7 +616,121 @@ use Filament\Support\Enums\Width;
 ->filtersLayout(FiltersLayout::AboveContent)      // Display filters above board
 ->filtersFormWidth(Width::Large)                  // Filter panel width
 ->filtersFormColumns(3)                           // Columns in filter form
+->headerToolbar()                                 // Inline filters/search in page header
+->collapseEmptyColumns()                          // Collapse columns holding no cards
+->collapsedColumns(['won', 'lost'])               // Collapse the listed columns
+->collapseAllColumns()                            // Collapse every column
+->collapsibleColumns(fn (string $columnId, bool $collapsed) => ...) // Toggle from the header and the rail
+->columnHeaderMenu(fn (array $column) => new HtmlString('...')) // Open a host block and the column actions from the heading
+->addColumnUsing(fn (string $name) => ...)       // Add a column from a tile after the last one
+->addColumnLabel('Add stage')                     // Tooltip for the tile
+->addColumnPlaceholder('Stage name')              // Placeholder for the name input
+->addColumnColorLabel('Pick :color')               // Accessible name of a color swatch
 ```
+
+### Modern board additions
+
+These settings apply to Modern boards only. A classic board ignores them.
+
+<table>
+<thead>
+  <tr>
+    <th>
+      Method
+    </th>
+    
+    <th>
+      Purpose
+    </th>
+  </tr>
+</thead>
+
+<tbody>
+  <tr>
+    <td>
+      <code>
+        createCardAction(Action|Closure|null)
+      </code>
+    </td>
+    
+    <td>
+      The action behind the header <code>
+        +
+      </code>
+      
+       and the add row
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        columnSummary(?Closure)
+      </code>
+    </td>
+    
+    <td>
+      Header text per column, from the filtered column query
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        groupings(array|Closure)
+      </code>
+    </td>
+    
+    <td>
+      "Group by" options, each a <code>
+        Grouping
+      </code>
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        lanesPerPage(int)
+      </code>
+    </td>
+    
+    <td>
+      Lanes rendered before "Show more lanes" (default 10)
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        Column::limit(int|Closure|null)
+      </code>
+    </td>
+    
+    <td>
+      Hard limit per column
+    </td>
+  </tr>
+  
+  <tr>
+    <td>
+      <code>
+        authorizeCardMove()
+      </code>
+      
+       / <code>
+        persistCardMove()
+      </code>
+    </td>
+    
+    <td>
+      Page hooks for checks and custom writes
+    </td>
+  </tr>
+</tbody>
+</table>
+
+See [Customization](https://relaticle.github.io/essentials/customization) for the add card action, card components, summaries and limits. See [Swimlanes](https://relaticle.github.io/essentials/swimlanes) for groupings and lanes, and [Design System](https://relaticle.github.io/essentials/design-system) for styling.
 
 ## Column Configuration
 
@@ -332,7 +739,28 @@ Column::make('identifier')
     ->label('Display Name')                       // Column header text
     ->color('blue')                              // Column color theme
     ->icon('heroicon-o-flag')                    // Column header icon
+    ->hidden(fn () => ! auth()->user()?->isStaff()) // Hide from rendering
+    ->visible(fn () => $this->showArchived)      // Inverse of hidden()
+    ->limit(3)                                   // Modern boards: hard limit, refuses drops when full
 ```
+
+### Building a column from a backed enum
+
+```php
+Column::enum(TaskStatus::Todo)                   // identifier = $enum->value
+```
+
+When the enum implements `HasLabel`, `HasColor`, or `HasIcon` those values are
+applied automatically; missing contracts are skipped. See the
+[Column Configuration guide](https://relaticle.github.io/essentials/customization#building-columns-from-enums)
+for a full example.
+
+### Conditional visibility
+
+Hidden columns are excluded from all column getters (`getColumns()`,
+`getColumnIdentifiers()`, `getColumnLabels()`, `getColumnColors()`). See
+[Conditional Visibility](https://relaticle.github.io/essentials/customization#conditional-visibility)
+for a worked example.
 
 ### Available Colors
 
@@ -355,11 +783,29 @@ These methods are available in your board components for programmatic control:
 $this->moveCard(string $cardId, string $targetColumnId, ?string $afterCardId = null, ?string $beforeCardId = null)
 ```
 
+On a Modern board, `moveCard()` takes two more arguments and returns `bool`. It returns `false` when it refuses a move.
+
+```php
+$this->moveCard(
+    string $cardId,
+    string $targetColumnId,
+    ?string $afterCardId = null,
+    ?string $beforeCardId = null,
+    ?string $fromLaneId = null,
+    ?string $toLaneId = null,
+): bool
+```
+
+Override `authorizeCardMove()` and `persistCardMove()` instead of `moveCard()`. See [Custom Card Movement Logic](https://relaticle.github.io/essentials/integration-patterns#custom-card-movement-logic).
+
 ### Pagination Control
 
 ```php
 // Load more cards for pagination
 $this->loadMoreItems(string $columnId, ?int $count = null)
+
+// Modern boards: load more cards into one lane cell
+$this->loadMoreItems(string $columnId, ?int $count = null, ?string $laneId = null)
 
 // Load all cards to enable reordering
 $this->loadAllItems(string $columnId)
@@ -508,3 +954,8 @@ document.addEventListener('livewire:init', () => {
     });
 });
 ```
+
+
+## Sitemap
+
+See the full [sitemap](https://relaticle.github.io/sitemap.md) for all pages.
